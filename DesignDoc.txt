@@ -1,0 +1,83 @@
+Logging:
+	Logging had to occur on the vanilla kernel as well as
+	the kernel using slim chance replacement algorithm.
+	It is done using log().
+The number of pages in each queue:
+	the two queue structs contain the field pq_cnt, which 
+	is the amount of pages in the queue. Simply print pq_cnt 
+	at the end of vm_pageout_scan
+The queues scanned in that run:
+	two variables are initialized to 0 at the top of 
+	vm_pageout_scan. Each time the inactive loop runs, increment
+	the inactive count, and each time the active loop runs,
+	increment the active count. Print at end.
+Pages moved from inactive to active:
+	vm_page_activate is responsible for this, so when
+	vm_page_activate is called increment a variable.
+Pages moved from inactive to cache:
+	vm_page_cache is responsbile for this, so when
+	it is called, increment a variable.
+Pages moved from inactive to free:
+	vm_page_free is responsible for this, so when
+	it is called, increment a variable.
+Pages moved from active to inactive:
+	vm_page_deactivate is responsible for this,
+	so when it is called increment a variable.
+Pages queued for flush:
+	vm_pageout_clean is responsible for this. It returns
+	the number of pages of pages which were paged out. 
+	So add the return value to a variable.
+
+
+Slim Chance:
+	Unless otherwise stated, modifications occured in vm_pageout.c
+
+Pageout scan made to run more frequently:
+	The vm_pageout_update_period global variable is set to 10
+	rather than to 600. This is the interval in seconds for active scan.
+	Setting it to 10 makes scan visit each page at least once
+	every 10 seconds. This change is made inside vm_pageout_init.
+
+Activity count halved instead of default:
+	Inside vm_pageout_scan in the loop over active pages,
+	if a page has not been referenced, then its activity 
+	count is reduced. It is currently reduced by 1 until it
+	reaches 0. We modified it so that activity count is set to
+	activity count/2 when it is reduced.
+
+Invalid pages moved to the rear of the free list:
+	If a page is invalid vm_page_free is called. vm_page_free
+	calls vm_page_toq calls vm_phys_free_pages, the function responsible
+	for actually placing on the free list. We insert into tail rather
+	than head. 
+
+Inactive pages moved to the rear of the free list:
+	Inactive pages get cached - which in the end puts
+	them on  the free list. The function modified for
+	invalid pages also handles the case of inactive pages.
+
+Pages moved to the front of the inactive list:
+	This modification had to occur in vm_page.c. The function
+	vm_page_deactivate deals with sending a page to the 
+	inactive queue. Instead of calling TAILQ_INSERT_TAIL inside 
+	_vm_page_deactivate, we call TAILQ_INSERT_HEAD, inserting 
+	the page at the head of the inactive queue.
+
+Pages moved to the front of the active list:
+	Similar change to the above, it occurs in vm_page.c. 
+	vm_page_activate is responsible for moving to active queue.
+	vm_page_activate calls vm_page_enqueue. So, we check if the
+	queue being inserted to is PQ_ACTIVE - if it is, then insert
+	at head with TAILQ_INSERT_HEAD, otherwise do the normal 
+	procedure (tail).
+
+
+Making sense of the statistics:
+	Logging occurs continuously while the system is running. We
+	used a bash script for making it easier to test repeatedly. 
+	The bash script logs a start marker before stressing and an
+	end marker after stressing and we read through the messages
+	file backwards, saving output from the end delimiter to the
+	start, and reversing it. 
+	We use matplotlib for graphing, showing each statstic being 
+	logged in its own graph. 
